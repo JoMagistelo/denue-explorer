@@ -50,6 +50,6 @@ def test_settings_collapsed_and_all_buttons_exist(monkeypatch):
     labels = [str(getattr(x, 'content', '')) for x in controls
               if isinstance(x, (ft.Button, ft.TextButton, ft.OutlinedButton))]
     for label in ('Buscar en DENUE', 'Limpiar', 'Exportar CSV',
-                  'Anterior', 'Siguiente', 'Configurar token', 'FME / SIGER'):
+                  'Anterior', 'Siguiente', 'Conexión HTTPS', 'FME / SIGER'):
         assert any(label in text for text in labels), label
     assert any(isinstance(x, ft.Container) and x.visible is False for x in controls)
