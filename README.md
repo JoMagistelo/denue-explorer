@@ -69,3 +69,17 @@ Documentación oficial: https://www.inegi.org.mx/servicios/api_denue.html
 - `/Nombre/{criterio}/{entidad}/{inicio}/{fin}/{token}`
 - `/BuscarEntidad/{criterio}/{entidad}/{inicio}/{fin}/{token}`
 - `/Ficha/{id}/{token}`
+
+## Diagnóstico confirmado de la clave actual (8 de octubre de 2026)
+
+Se comprobó mediante una petición real al servicio oficial que las consultas `Nombre/bimbo` y `BuscarEntidad/bimbo` reciben **HTTP 200** con un **mensaje JSON de no autorización**, no una lista de establecimientos. Por eso la versión anterior mostraba «Respuesta inesperada de INEGI». El problema es la credencial rechazada por el servicio, no el diseño de Flet.
+
+La aplicación ahora interpreta correctamente ese mensaje y distingue:
+- Listas de establecimientos y listas vacías.
+- JSON envuelto en objetos de respuesta.
+- Objetos de error, mensajes del servicio, HTML de bloqueo y JSON inválido.
+- Credencial rechazada con código HTTP 200 o 401/403.
+
+**Para hacer consultas de verdad hace falta una clave activa de la API DENUE.** Solicítala o regénérala a través de la [página oficial del INEGI](https://www.inegi.org.mx/servicios/api_denue.html). Como pediste incrustarla en el programa, sustituye una única vez el valor `BUILTIN_TOKEN` del archivo `src/denue_explorer/settings.py` con tu nueva clave, guarda el archivo y reinicia la app. En esta instalación editable no tienes que repetir `setup.ps1`. Evita compartir la nueva clave en GitHub público.
+
+Para comprobar el formato de respuesta sin imprimir el token, puedes ejecutar `.\.venv\Scripts\python.exe scripts/diagnose_api.py`.
