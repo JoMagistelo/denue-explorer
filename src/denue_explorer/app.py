@@ -34,13 +34,13 @@ def txt(row: dict, field: str) -> str:
 
 def main(page: ft.Page) -> None:
     page.title = 'DENUE Explorer'
-    page.window.width = 1220
-    page.window.height = 800
+    page.window.width = 1180
+    page.window.height = 780
     page.window.min_width = 900
     page.window.min_height = 630
     page.bgcolor = '#F5F7FB'
     page.scroll = ft.ScrollMode.AUTO
-    page.padding = 14
+    page.padding = 12
     page.theme_mode = ft.ThemeMode.LIGHT
 
     rows: list[dict] = []
@@ -48,9 +48,9 @@ def main(page: ft.Page) -> None:
     current_query: SearchQuery | None = None
 
     token = ft.TextField(label='Token INEGI', value=load_token(),
-                         password=True, can_reveal_password=True, expand=True)
-    ca_field = ft.TextField(label='CA institucional (ruta .pem, opcional)',
-                            value=os.getenv('DENUE_CA_BUNDLE',''), expand=True, dense=True)
+                         password=True, can_reveal_password=True, width=400, dense=True)
+    ca_field = ft.TextField(label='Certificado HTTPS (.pem, opcional)',
+                            value=os.getenv('DENUE_CA_BUNDLE',''), width=480, dense=True)
     mode = ft.Dropdown(label='Método', value='Nombre', width=225, dense=True, options=[
         ft.DropdownOption(key='Nombre', text='Nombre / razón social'),
         ft.DropdownOption(key='BuscarEntidad', text='Palabras clave'),
@@ -59,17 +59,24 @@ def main(page: ft.Page) -> None:
     entity = ft.Dropdown(label='Entidad', value='00', width=245, dense=True, options=[
         ft.DropdownOption(key=k,text=f'{k} · {v}') for k,v in STATES.items()
     ])
-    term = ft.TextField(label='Nombre, razón social, palabra clave o ID', expand=True, dense=True)
+    term = ft.TextField(label='Nombre, razón social, actividad o ID', expand=True,
+                        dense=True, hint_text='Ej. master black')
     start = ft.TextField(label='Inicio', value='1', width=78, dense=True)
     end = ft.TextField(label='Fin', value='50', width=78, dense=True)
-    filter_field = ft.TextField(label='Filtrar página (incluye CLEE)', expand=True, dense=True)
-    status = ft.Text('Configura tu token y realiza una búsqueda.', selectable=True)
+    filter_field = ft.TextField(label='Filtro local (incluye CLEE)', width=320, dense=True)
+    status = ft.Text('Listo para buscar.' if token.value else
+                     'Configura el token una sola vez con «Configurar token».',
+                     selectable=True, size=12, color='#334155')
     total = ft.Text('0 resultados', weight=ft.FontWeight.BOLD)
-    detail = ft.Column([ft.Text('Selecciona una empresa de la tabla.')], spacing=5)
+    detail = ft.Column([ft.Text('Selecciona una empresa para ver sus datos.', size=12)],
+                       spacing=5, scroll=ft.ScrollMode.AUTO)
     grid = ft.DataTable(columns=[ft.DataColumn(ft.Text(v, size=12)) for v in
         ('ID', 'Establecimiento', 'Razón social', 'Actividad', 'Ubicación')], rows=[],
-        show_checkbox_column=False, column_spacing=12, heading_row_height=42,
-        data_row_min_height=42, data_row_max_height=62)
+        show_checkbox_column=False, column_spacing=12, heading_row_height=40,
+        data_row_min_height=40, data_row_max_height=60)
+    empty_hint = ft.Text('Sin resultados. Busca un establecimiento para comenzar.',
+                         size=12, color='#64748B')
+    page_label = ft.Text('Sin búsqueda', size=11, color='#64748B')
 
     def show_detail(record: dict) -> None:
         nonlocal selected
@@ -99,7 +106,13 @@ def main(page: ft.Page) -> None:
             for k in ('Id','Nombre','Razon_social','Clase_actividad','Ubicacion')])
             for r in visible]
         total.value = f'{len(visible)} visibles / {len(rows)} recibidos'
-        export_button.disabled = not rows
+        empty_hint.visible = not bool(visible)
+        empty_hint.value = ('Sin coincidencias en este filtro.' if rows
+                            else 'Sin resultados. Busca un establecimiento para comenzar.')
+        page_label.value = ('Ficha por ID' if current_query and current_query.mode == 'Ficha'
+                            else f'Registros {current_query.start}–{current_query.end}'
+                            if current_query else 'Sin búsqueda')
+        export_button.disabled = not bool(visible)
         prev_button.disabled = not current_query or current_query.mode == 'Ficha' or current_query.start <= 1
         next_button.disabled = not current_query or current_query.mode == 'Ficha' or len(rows) < (current_query.end-current_query.start+1)
         page.update()
@@ -149,7 +162,8 @@ def main(page: ft.Page) -> None:
             page.update()
 
     def export_click(e) -> None:
-        if not rows:
+        if not [r for r in rows if (filter_field.value or '').casefold().strip() in
+                ' '.join(str(v) for v in r.values()).casefold()]:
             return
         output = Path.home() / 'Downloads' / 'denue_resultados.csv'
         output.parent.mkdir(parents=True,exist_ok=True)
@@ -183,7 +197,9 @@ def main(page: ft.Page) -> None:
     def save_click(e):
         try:
             save_token(token.value or '')
-            status.value = 'Token guardado en las credenciales locales de Windows.'
+            status.value = 'Token listo. Ya puedes buscar.'
+            token_hint.value = 'Token configurado ✓'
+            settings_panel.visible = False
         except CredentialError as exc:
             status.value = str(exc)
         page.update()
@@ -192,7 +208,9 @@ def main(page: ft.Page) -> None:
         try:
             delete_token()
             token.value = ''
-            status.value = 'Token eliminado de Windows y del formulario.'
+            status.value = 'Token eliminado. Configura uno antes de buscar.'
+            token_hint.value = 'Falta token'
+            settings_panel.visible = True
         except CredentialError as exc:
             status.value = str(exc)
         page.update()
@@ -221,43 +239,71 @@ def main(page: ft.Page) -> None:
             bgcolor='#FFFFFF', border_radius=12, padding=14,
             content=ft.Column(controls, spacing=9))
 
-    page.add(
-        ft.Row([ft.Icon(ft.Icons.BUSINESS, color='#2857A8', size=28),
-                ft.Text('DENUE Explorer', size=23, color='#1C3254',
-                        weight=ft.FontWeight.BOLD),
-                ft.Text('INEGI · Buscador empresarial', size=12, color='#64748B')],
-               wrap=True),
-        section([
-            ft.Row([ft.Text('Búsqueda', weight=ft.FontWeight.BOLD, size=15),
-                    ft.TextButton(content='Consulta FME en SIGER ↗',
-                        on_click=lambda e: webbrowser.open('https://rpc.economia.gob.mx/'))]),
-            ft.Row([mode,entity,start,end],wrap=True),
-            ft.Row([term,search_button,
-                    ft.TextButton(content='Limpiar', on_click=clear_click)],wrap=True),
-            ft.Text('Nombre o razón social · Palabras clave · Ficha por ID. FME es externo a DENUE.',
-                    size=11, color='#64748B'),
-        ]),
-        section([
-            ft.Row([ft.Text('Configuración local', size=14, weight=ft.FontWeight.BOLD),
-                    ft.Text('Tu token no se publica en GitHub', size=11, color='#64748B')],
-                   wrap=True),
+    token_hint = ft.Text('Token configurado ✓' if token.value else 'Falta token',
+                         size=11, color='#475569')
+
+    def toggle_settings(_=None):
+        settings_panel.visible = not settings_panel.visible
+        page.update()
+
+    settings_panel = ft.Container(
+        visible=False, bgcolor='#FFFFFF', padding=12, border_radius=10,
+        content=ft.Column([
+            ft.Text('Credencial local: no se sube a GitHub',
+                    weight=ft.FontWeight.BOLD, size=12),
             ft.Row([token,
                     ft.OutlinedButton(content='Guardar token', on_click=save_click),
-                    ft.TextButton(content='Eliminar', on_click=delete_click)],wrap=True),
+                    ft.TextButton(content='Eliminar', on_click=delete_click)]),
             ca_field,
+        ], spacing=8))
+
+    def panel(controls):
+        return ft.Container(
+            bgcolor='#FFFFFF', padding=12, border_radius=10,
+            content=ft.Column(controls, spacing=8))
+
+    page.add(
+        ft.Row([
+            ft.Icon(ft.Icons.BUSINESS, color='#2454A6', size=24),
+            ft.Text('DENUE Explorer', size=21, color='#1B3052',
+                    weight=ft.FontWeight.BOLD),
+            ft.Text('INEGI · Consulta empresarial', size=11, color='#64748B'),
+            ft.Container(expand=True),
+            token_hint,
+            ft.TextButton(content='Configurar token', on_click=toggle_settings),
         ]),
-        status,
-        section([
-            ft.Row([total,filter_field,export_button],wrap=True),
-            ft.Row([prev_button,ft.Text('Rango máximo: 100 registros',size=11),
-                    next_button],wrap=True),
-            ft.Row([grid],scroll=ft.ScrollMode.ALWAYS),
+        settings_panel,
+        panel([
+            ft.Row([
+                ft.Text('Buscar establecimientos', weight=ft.FontWeight.BOLD, size=14),
+                ft.Container(expand=True),
+                ft.TextButton(content='FME / SIGER ↗',
+                    on_click=lambda e: webbrowser.open('https://rpc.economia.gob.mx/')),
+            ]),
+            ft.Row([mode, entity, start, end], spacing=10),
+            # Nunca combinar wrap=True con TextField(expand=True):
+            # produjo un área gris gigante en Windows con Flet 1.0.3.
+            ft.Row([term, search_button,
+                    ft.TextButton(content='Limpiar', on_click=clear_click)],
+                    spacing=10),
+            ft.Text('Nombre, razón social, actividad y palabras clave · Ficha por ID DENUE.',
+                    size=11, color='#64748B'),
         ]),
-        section([
-            ft.Text('Detalles del establecimiento',size=15,weight=ft.FontWeight.BOLD),
-            detail,
+        ft.Container(bgcolor='#E8F0FC', border_radius=8, padding=9, content=status),
+        panel([
+            ft.Row([total, ft.Container(expand=True), filter_field,
+                    export_button], spacing=8),
+            ft.Row([prev_button, page_label, next_button], spacing=8),
+            ft.Container(height=280, content=ft.Column([
+                empty_hint,
+                ft.Row([grid], scroll=ft.ScrollMode.ALWAYS)
+            ], scroll=ft.ScrollMode.AUTO)),
         ]),
-        ft.Text('Fuente INEGI DENUE · Aplicación no afiliada a INEGI',size=11,
-                color='#64748B'),
+        panel([
+            ft.Text('Detalles del establecimiento', weight=ft.FontWeight.BOLD, size=14),
+            ft.Container(height=130, content=detail),
+        ]),
+        ft.Text('Fuente: INEGI DENUE · No afiliada al INEGI',
+                size=10, color='#64748B'),
     )
     on_mode_select()
