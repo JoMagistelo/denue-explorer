@@ -16,13 +16,23 @@ cd denue-explorer
 .\scripts\run.ps1
 ```
 
-> `TU_USUARIO` es un marcador: sustituye por tu usuario al crear el repositorio GitHub. Si Windows bloquea scripts, ejecuta `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`.
+> Si Windows bloquea scripts, ejecuta `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`.
 
-Ingresa el token en la aplicación y pulsa **Guardar token** para almacenarlo en el gestor de credenciales del sistema (Windows Credential Manager a través de keyring), o pulsa **Eliminar** para borrarlo. Alternativamente, o establece temporalmente ` $env:INEGI_DENUE_TOKEN='tu-token' ` antes de iniciar.
+### Configurar el token una sola vez (recomendado)
+
+En PowerShell ejecuta después de instalar:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configurar-token.ps1
+```
+
+Pega el token cuando se solicite: la entrada permanece oculta. El token se guarda en **Windows Credential Manager** y se carga automáticamente cada vez que abras la app. **No hay que volver a escribirlo ni tocar el código Python**. Para actualizarlo, ejecuta el mismo comando. El botón `Configurar token` permite modificarlo desde la aplicación.
+
+No añadas el token como cadena literal a los archivos Python de un repositorio público. Como alternativa, puedes definir temporalmente la variable de entorno `INEGI_DENUE_TOKEN` antes de iniciar.
 
 ## Seguridad del token
 
-**El token no se incluye en el código ni en GitHub.** Solo se guarda en el equipo al pulsar *Guardar token*. Si ya lo compartiste fuera del equipo, es recomendable regenerarlo en INEGI. Para las redes con inspección SSL, proporciona la ruta de tu CA institucional desde la interfaz, sin desactivar la validación HTTPS.
+**El token no se incluye en el código ni en GitHub.** Se guarda en tu equipo al usar el script de configuración o al pulsar *Guardar token*. Si ya lo compartiste fuera del equipo, es recomendable regenerarlo en INEGI. Para las redes con inspección SSL, proporciona la ruta de tu CA institucional desde la interfaz, sin desactivar la validación HTTPS.
 
 ## Buscar
 - **Nombre**: establecimiento o razón social, entidad opcional `00` para México.
@@ -66,7 +76,7 @@ Busca el ejecutable en `dist\DENUE-Explorer.exe`. Debe construirse **en Windows*
 ## Limitaciones verificadas
 - La API DENUE exige token y conexión. No es posible validar respuesta de producción sin un token real.
 - Sin certificado CA institucional confiable, una red con interceptación HTTPS puede impedir la conexión.
-- No se promete compatibilidad universal con futuras versiones de Flet: se mantiene la restricción `<2`.
+- Flet está limitado a `>=1.0.3,<1.1`; los cambios futuros necesitan su propia validación.
 - GitHub Actions ejecutará pruebas en Windows tras publicar el repositorio.
 
 ## Endpoints respaldados oficialmente
@@ -76,3 +86,16 @@ Busca el ejecutable en `dist\DENUE-Explorer.exe`. Debe construirse **en Windows*
 `/Ficha/{id}/{token}`
 
 Documentación: https://www.inegi.org.mx/servicios/api_denue.html
+
+## Corrección visual de Flet 1.0.3
+
+Se eliminó la combinación `Row(wrap=True)` con `TextField(expand=True)` que ocultaba la búsqueda tras un gran rectángulo gris. La pantalla tiene un buscador visible, configuración plegada, tabla de altura limitada (280 px), filtro y detalle con desplazamiento. El resultado del test de construcción de controles no sustituye una inspección visual humana en Windows.
+
+## Qué validar antes del merge
+
+```powershell
+.\scripts\test.ps1
+.\scripts\run.ps1
+```
+
+Verifica nombre, razón social, palabras clave, ficha por ID, anterior/siguiente, filtro CLEE, detalle, Google Maps, CSV, SIGER, guardar y eliminar token. Las consultas reales dependen del servicio del INEGI y de la cadena de certificados TLS instalada en tu equipo.
