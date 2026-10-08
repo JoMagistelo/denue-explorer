@@ -9,7 +9,7 @@ from urllib.parse import quote
 import flet as ft
 
 from .client import DenueError, SearchQuery, export_csv, search
-from .settings import CredentialError, load_token, save_token, delete_token
+from .settings import load_token
 
 STATES = {
     '00': 'Toda la República', '01': 'Aguascalientes', '02': 'Baja California',
@@ -47,8 +47,7 @@ def main(page: ft.Page) -> None:
     selected: dict | None = None
     current_query: SearchQuery | None = None
 
-    token = ft.TextField(label='Token INEGI', value=load_token(),
-                         password=True, can_reveal_password=True, width=400, dense=True)
+    token = load_token()  # Incorporado en settings.py; sin formulario ni configuración
     ca_field = ft.TextField(label='Certificado HTTPS (.pem, opcional)',
                             value=os.getenv('DENUE_CA_BUNDLE',''), width=480, dense=True)
     mode = ft.Dropdown(label='Método', value='Nombre', width=225, dense=True, options=[
@@ -64,9 +63,7 @@ def main(page: ft.Page) -> None:
     start = ft.TextField(label='Inicio', value='1', width=78, dense=True)
     end = ft.TextField(label='Fin', value='50', width=78, dense=True)
     filter_field = ft.TextField(label='Filtro local (incluye CLEE)', width=320, dense=True)
-    status = ft.Text('Listo para buscar.' if token.value else
-                     'Configura el token una sola vez con «Configurar token».',
-                     selectable=True, size=12, color='#334155')
+    status = ft.Text('Listo para buscar en INEGI.', selectable=True, size=12, color='#334155')
     total = ft.Text('0 resultados', weight=ft.FontWeight.BOLD)
     detail = ft.Column([ft.Text('Selecciona una empresa para ver sus datos.', size=12)],
                        spacing=5, scroll=ft.ScrollMode.AUTO)
@@ -128,7 +125,7 @@ def main(page: ft.Page) -> None:
                 q = SearchQuery(mode.value, term.value or '', entity.value,
                                 int(start.value), int(end.value))
             q.validate()
-            if not token.value or token.value.strip() == 'AQUÍ_VA_TU_TOKEN':
+            if not token or token.strip() == 'AQUÍ_VA_TU_TOKEN':
                 raise DenueError('Captura tu token personal de INEGI.')
             selected_ca = (ca_field.value or '').strip() or None
             if selected_ca and not Path(selected_ca).is_file():
@@ -141,7 +138,7 @@ def main(page: ft.Page) -> None:
         status.value = 'Consultando INEGI…'
         page.update()
         try:
-            result = await asyncio.to_thread(search,q,token.value,ca_bundle=selected_ca)
+            result = await asyncio.to_thread(search,q,token,ca_bundle=selected_ca)
             rows = result
             current_query = q
             selected = None
@@ -194,27 +191,6 @@ def main(page: ft.Page) -> None:
     filter_field.on_change = lambda e: render()
     term.on_submit = run_search
 
-    def save_click(e):
-        try:
-            save_token(token.value or '')
-            status.value = 'Token listo. Ya puedes buscar.'
-            token_hint.value = 'Token configurado ✓'
-            settings_panel.visible = False
-        except CredentialError as exc:
-            status.value = str(exc)
-        page.update()
-
-    def delete_click(e):
-        try:
-            delete_token()
-            token.value = ''
-            status.value = 'Token eliminado. Configura uno antes de buscar.'
-            token_hint.value = 'Falta token'
-            settings_panel.visible = True
-        except CredentialError as exc:
-            status.value = str(exc)
-        page.update()
-
     def clear_click(e):
         nonlocal rows, selected, current_query
         if search_button.disabled:
@@ -234,13 +210,7 @@ def main(page: ft.Page) -> None:
 
     mode.on_select = on_mode_select
 
-    def section(controls):
-        return ft.Container(
-            bgcolor='#FFFFFF', border_radius=12, padding=14,
-            content=ft.Column(controls, spacing=9))
-
-    token_hint = ft.Text('Token configurado ✓' if token.value else 'Falta token',
-                         size=11, color='#475569')
+    token_hint = ft.Text('API configurada', size=11, color='#475569')
 
     def toggle_settings(_=None):
         settings_panel.visible = not settings_panel.visible
@@ -249,11 +219,9 @@ def main(page: ft.Page) -> None:
     settings_panel = ft.Container(
         visible=False, bgcolor='#FFFFFF', padding=12, border_radius=10,
         content=ft.Column([
-            ft.Text('Credencial local: no se sube a GitHub',
-                    weight=ft.FontWeight.BOLD, size=12),
-            ft.Row([token,
-                    ft.OutlinedButton(content='Guardar token', on_click=save_click),
-                    ft.TextButton(content='Eliminar', on_click=delete_click)]),
+            ft.Text('Opciones de conexión HTTPS', weight=ft.FontWeight.BOLD, size=12),
+            ft.Text('Solo si tu red corporativa requiere un certificado CA adicional.',
+                    size=11, color='#64748B'),
             ca_field,
         ], spacing=8))
 
@@ -270,7 +238,7 @@ def main(page: ft.Page) -> None:
             ft.Text('INEGI · Consulta empresarial', size=11, color='#64748B'),
             ft.Container(expand=True),
             token_hint,
-            ft.TextButton(content='Configurar token', on_click=toggle_settings),
+            ft.TextButton(content='Conexión HTTPS', on_click=toggle_settings),
         ]),
         settings_panel,
         panel([
