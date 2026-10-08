@@ -142,6 +142,12 @@ def parse_denue_response(raw: bytes, *, token: str = '',
         message = _safe_server_message(payload, token)
         if _empty_result_message(message):
             return []
+        if 'no autorizado' in message.casefold() or 'clave válida' in message.casefold():
+            raise DenueError(
+                'INEGI rechazó el token DENUE incorporado: ' + message
+                + ' Obtén una clave vigente de la API DENUE y reemplaza BUILTIN_TOKEN '
+                  'en settings.py. No es un fallo del buscador.'
+            )
         raise DenueError('INEGI respondió: ' + (message or '(mensaje vacío)'))
 
     if payload is None:
