@@ -1,9 +1,13 @@
-"""Credenciales locales del sistema: el token no se incluye en el código."""
+"""Configuración DENUE: token incorporado a petición del propietario del repositorio."""
 from __future__ import annotations
 import os
 
 SERVICE = "denue-explorer"
 ACCOUNT = "inegi-denue-token"
+
+# El propietario pidió incorporar el token directamente. ATENCIÓN:
+# Esta clave es pública mientras el repositorio permanezca público.
+BUILTIN_TOKEN = "374ad581-44c0-42e5-945b-65e52ec0517d"
 
 class CredentialError(RuntimeError):
     pass
@@ -14,9 +18,10 @@ def load_token() -> str:
         return env
     try:
         import keyring
-        return (keyring.get_password(SERVICE, ACCOUNT) or "").strip()
+        stored = (keyring.get_password(SERVICE, ACCOUNT) or "").strip()
+        return stored or BUILTIN_TOKEN
     except Exception:
-        return ""
+        return BUILTIN_TOKEN
 
 def save_token(token: str) -> None:
     token = token.strip()
