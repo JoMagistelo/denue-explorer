@@ -38,3 +38,9 @@ def test_token_is_redacted_in_server_message():
     with pytest.raises(DenueError) as info:
         parse_denue_response(message, token=secret)
     assert secret not in str(info.value)
+
+def test_real_inegi_authorization_response_is_actionable():
+    # Observed in live CI as JSON string with HTTP 200.
+    response = json.dumps('No autorizado. Utilice una clave válida.').encode()
+    with pytest.raises(DenueError, match='rechazó el token DENUE incorporado'):
+        parse_denue_response(response)
