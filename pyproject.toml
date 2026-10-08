@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "denue-explorer"
+version = "1.0.0"
+description = "Cliente de escritorio para consultar DENUE (INEGI)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["flet>=0.86,<2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+denue-explorer = "denue_explorer.cli:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
