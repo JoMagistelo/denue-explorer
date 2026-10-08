@@ -13,7 +13,7 @@ from denue_explorer.client import DenueError, parse_denue_response
     (b'{"Id":"2","Nombre":"Prueba"}', [{'Id':'2','Nombre':'Prueba'}]),
     (b'"No se encontraron resultados"', []),
     (b'{"Mensaje":"No se encontraron registros"}', []),
-    (b'"[{\"Id\":\"1\"}]"', [{'Id':'1'}]),
+    (json.dumps('[{"Id":"1"}]').encode(), [{'Id':'1'}]),
 ])
 def test_response_formats(body, expected):
     assert parse_denue_response(body) == expected
