@@ -22,7 +22,7 @@ git switch --track origin/feat/local-credentials-ui-audit
 
 Si la rama ya existe en tu equipo: `git switch feat/local-credentials-ui-audit; git pull --ff-only`.
 
-**No hay que capturar ni guardar el token.** El token proporcionado por el propietario está incorporado en `src/denue_explorer/settings.py`. El programa lo carga solo al comenzar. La variable opcional `INEGI_DENUE_TOKEN` permite reemplazarlo sin editar el archivo.
+**No se necesita capturar el token al iniciar.** Si existe `src/denue_explorer/local_token.py`, se utiliza su valor `BUILTIN_TOKEN` automáticamente; este archivo está ignorado por Git y protege tu token nuevo frente a futuras actualizaciones. Si no existe, usa el token incorporado en `settings.py` o la variable de entorno de respaldo.
 
 > **Atención:** este repositorio es público y la credencial incorporada también. Toda persona con acceso al repositorio puede verla y usarla. Si INEGI permite regenerarla, hazlo cuando terminen las pruebas y actualiza el valor.
 
@@ -102,3 +102,34 @@ El diagnóstico imprime la ruta de `settings.py`, el **origen** (nunca el conten
 - Si la ruta muestra otra carpeta, se estaba ejecutando otra copia de la aplicación.
 
 Si modificas `settings.py`, **reinicia la aplicación**. No necesitas volver a ejecutar `setup.ps1` porque el proyecto se instaló en modo editable. No publiques claves nuevas en el repositorio público.
+
+## Actualizar sin perder el token ya editado (Windows)
+
+Si actualizaste el token manualmente en `settings.py` y Git muestra `local changes to settings.py would be overwritten by merge`, **no uses `git reset --hard` ni `git stash pop`**. Haz una migración de la clave ya existente:
+
+```powershell
+cd C:\Proyectos\denue-explorer
+Copy-Item .\src\denue_explorer\settings.py .\src\denue_explorer\local_token.py -Force
+git stash push -m "respaldo token local" -- src/denue_explorer/settings.py
+git switch main
+git pull --ff-only origin main
+.\scripts\run.ps1
+```
+
+El primer comando copia tu clave nueva sin mostrarla en pantalla. El segundo guarda la modificación local para que Git pueda actualizar; **no se necesita restaurar el stash**: la copia privada `local_token.py` se carga con prioridad automáticamente y Git la ignora. `git pull origin master` no funciona porque la rama principal se llama `main`.
+
+En actualizaciones posteriores bastará con:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+.\scripts\run.ps1
+```
+
+Para saber cuál archivo y configuración están activos, sin revelar la clave:
+
+```powershell
+.\.venv\Scripts\python.exe -m denue_explorer.diagnostics
+```
+
+Si el servidor responde `No autorizado` con el token nuevo, es un rechazo real de INEGI y no un problema de `git pull`. No publiques `local_token.py` ni restaures la modificación de `settings.py` tras hacer la migración.
