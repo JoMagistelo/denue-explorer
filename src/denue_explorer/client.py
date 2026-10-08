@@ -51,32 +51,133 @@ def build_url(query: SearchQuery, token: str) -> str:
     return f'{BASE_URL}/{suffix}/{quote(token, safe="")}'
 
 
+
+def _safe_server_message(value: Any, token: str) -> str:
+    """Messages sent by INEGI should never expose the embedded credential."""
+    text = ' '.join(str(value).split())
+    if token:
+        text = text.replace(token, '[TOKEN OCULTO]')
+        text = text.replace(quote(token, safe=''), '[TOKEN OCULTO]')
+    return text[:350]
+
+
+def _empty_result_message(text: str) -> bool:
+    lowered = text.casefold()
+    return any(marker in lowered for marker in (
+        'no se encontraron', 'sin resultados', 'no hay resultados',
+        'no existen establecimientos', 'no existe información',
+    ))
+
+
+def parse_denue_response(raw: bytes, *, token: str = '',
+                         content_type: str = '') -> list[dict[str, Any]]:
+    """Interpret standard arrays and report actual API error messages.
+
+    DENUE officially returns lists for successful queries. A non-list payload
+    is not silently treated as an establishment. Some proxies and backends
+    respond with a JSON message even when the HTTP status is 200.
+    """
+    try:
+        payload: Any = json.loads(raw.decode('utf-8-sig'))
+    except (ValueError, UnicodeDecodeError) as exc:
+        sample = raw[:180].decode('utf-8', errors='replace').lower()
+        if '<html' in sample or '<!doctype html' in sample or 'html' in content_type.lower():
+            raise DenueError(
+                'INEGI devolvió una página HTML en lugar de JSON. '
+                'Puede deberse a un bloqueo, mantenimiento o proxy corporativo.'
+            ) from exc
+        raise DenueError('INEGI no devolvió JSON válido. Revisa el servicio o la red.') from exc
+
+    # Tolerate serialized JSON strings, used by some .NET services.
+    for _ in range(2):
+        if isinstance(payload, str) and payload.strip().startswith(('[', '{')):
+            try:
+                payload = json.loads(payload)
+            except ValueError:
+                break
+        else:
+            break
+
+    if isinstance(payload, list):
+        if all(isinstance(item, dict) for item in payload):
+            return payload
+        raise DenueError('INEGI devolvió una lista con elementos que no son establecimientos.')
+
+    if isinstance(payload, dict):
+        index = {str(key).casefold(): key for key in payload}
+        err_key = index.get('error') or index.get('errors')
+        if err_key is not None and payload[err_key] not in (None, False, '', []):
+            msg = _safe_server_message(payload[err_key], token)
+            if _empty_result_message(msg):
+                return []
+            raise DenueError('INEGI reportó un error: ' + msg)
+
+        for alias in ('datos', 'data', 'resultados', 'results',
+                      'resultado', 'response', 'value', 'd'):
+            key = index.get(alias)
+            if key is None:
+                continue
+            value = payload[key]
+            if isinstance(value, list) and all(isinstance(x, dict) for x in value):
+                return value
+            if isinstance(value, str) and value.strip().startswith('['):
+                return parse_denue_response(value.encode('utf-8'), token=token)
+
+        if 'id' in index and ('nombre' in index or 'clee' in index):
+            return [payload]
+
+        for alias in ('mensaje', 'message', 'descripcion', 'detalle', 'detail', 'status'):
+            if alias in index:
+                msg = _safe_server_message(payload[index[alias]], token)
+                if _empty_result_message(msg):
+                    return []
+                raise DenueError('INEGI respondió: ' + msg)
+        keys = ', '.join(_safe_server_message(k, token) for k in list(payload)[:6])
+        raise DenueError(
+            f'INEGI devolvió un objeto sin establecimientos (campos: {keys}). '
+            'Revisa si el token está activo o si el servicio cambió la respuesta.'
+        )
+
+    if isinstance(payload, str):
+        message = _safe_server_message(payload, token)
+        if _empty_result_message(message):
+            return []
+        raise DenueError('INEGI respondió: ' + (message or '(mensaje vacío)'))
+
+    if payload is None:
+        raise DenueError('INEGI devolvió null; revisa la vigencia del token o el servicio.')
+    raise DenueError('INEGI devolvió un tipo inesperado: ' + type(payload).__name__)
+
+
 def search(query: SearchQuery, token: str, *, ca_bundle: str | None = None,
            timeout: int = 25, opener: Any = None) -> list[dict[str, Any]]:
     url = build_url(query, token)
     if opener is None:
-        context = ssl.create_default_context(cafile=ca_bundle or None)
+        try:
+            context = ssl.create_default_context(cafile=ca_bundle or None)
+        except (OSError, ssl.SSLError) as exc:
+            raise DenueError('No se pudo cargar el archivo CA. Comprueba la ruta y el formato PEM.') from exc
         opener = build_opener(HTTPSHandler(context=context))
-    request = Request(url, headers={'Accept': 'application/json', 'User-Agent': 'DenueExplorer/1.0'})
+    request = Request(url, headers={'Accept': 'application/json',
+                                     'User-Agent': 'DenueExplorer/1.1'})
     try:
         with opener.open(request, timeout=timeout) as response:
             raw = response.read()
+            content_type = (response.headers.get('Content-Type', '')
+                            if getattr(response, 'headers', None) is not None else '')
     except HTTPError as exc:
         if exc.code in (401, 403):
-            raise DenueError('INEGI rechazó la solicitud (HTTP %d). Revisa el token.' % exc.code) from exc
-        raise DenueError(f'INEGI devolvió HTTP {exc.code}. Inténtalo después.') from exc
+            raise DenueError(f'INEGI rechazó el acceso (HTTP {exc.code}). Revisa si el token está activo.') from exc
+        if exc.code == 429:
+            raise DenueError('INEGI limitó las consultas (HTTP 429). Intenta de nuevo más tarde.') from exc
+        raise DenueError(f'INEGI devolvió HTTP {exc.code}. El servicio puede estar temporalmente indisponible.') from exc
     except (ssl.SSLError, URLError, TimeoutError, OSError) as exc:
         reason = str(getattr(exc, 'reason', exc)).lower()
         if 'certificate' in reason or 'ssl' in reason:
-            raise DenueError('No se pudo validar HTTPS. Si estás en una red institucional, configura un archivo CA PEM de confianza en DENUE_CA_BUNDLE.') from exc
-        raise DenueError('No se pudo conectar con INEGI. Comprueba tu red o proxy y vuelve a intentar.') from exc
-    try:
-        result = json.loads(raw)
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise DenueError('INEGI no devolvió JSON válido. Revisa el servicio o el token.') from exc
-    if not isinstance(result, list) or any(not isinstance(row, dict) for row in result):
-        raise DenueError('Respuesta inesperada de INEGI. No se pudieron procesar los datos.')
-    return result
+            raise DenueError('No se pudo validar HTTPS. Si estás en una red institucional, '
+                             'configura el certificado raíz PEM desde Conexión HTTPS.') from exc
+        raise DenueError('No se pudo conectar con INEGI. Comprueba red y proxy.') from exc
+    return parse_denue_response(raw, token=token, content_type=content_type)
 
 
 def export_csv(rows: list[dict[str, Any]], file_path: str) -> None:
