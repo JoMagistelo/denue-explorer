@@ -9,3 +9,7 @@ dist/
 *.pem
 *.key
 *.spec
+
+*.env.local
+*.credentials
+local_settings.json
