@@ -125,8 +125,9 @@ def main(page: ft.Page) -> None:
                 q = SearchQuery(mode.value, term.value or '', entity.value,
                                 int(start.value), int(end.value))
             q.validate()
-            if not token or token.strip() == 'AQUÍ_VA_TU_TOKEN':
-                raise DenueError('Captura tu token personal de INEGI.')
+            active_token = load_token()
+            if not active_token or active_token.strip() == 'AQUÍ_VA_TU_TOKEN':
+                raise DenueError('No hay token DENUE configurado en settings.py.')
             selected_ca = (ca_field.value or '').strip() or None
             if selected_ca and not Path(selected_ca).is_file():
                 raise DenueError('El certificado CA indicado no existe. Corrige la ruta.')
@@ -138,7 +139,7 @@ def main(page: ft.Page) -> None:
         status.value = 'Consultando INEGI…'
         page.update()
         try:
-            result = await asyncio.to_thread(search,q,token,ca_bundle=selected_ca)
+            result = await asyncio.to_thread(search,q,active_token,ca_bundle=selected_ca)
             rows = result
             current_query = q
             selected = None
@@ -210,7 +211,7 @@ def main(page: ft.Page) -> None:
 
     mode.on_select = on_mode_select
 
-    token_hint = ft.Text('API configurada', size=11, color='#475569')
+    token_hint = ft.Text('Clave configurada (pendiente de validar)', size=11, color='#475569')
 
     def toggle_settings(_=None):
         settings_panel.visible = not settings_panel.visible
