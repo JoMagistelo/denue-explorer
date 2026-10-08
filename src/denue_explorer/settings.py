@@ -1,37 +1,18 @@
-"""Credenciales locales del sistema: el token no se incluye en el código."""
+"""Configuración del cliente DENUE.
+
+El valor fue proporcionado por el propietario para incorporarlo directamente.
+ATENCIÓN: este repositorio es público; el token también lo es.
+"""
 from __future__ import annotations
+
 import os
 
-SERVICE = "denue-explorer"
-ACCOUNT = "inegi-denue-token"
+BUILTIN_TOKEN = "374ad581-44c0-42e5-945b-65e52ec0517d"
 
-class CredentialError(RuntimeError):
-    pass
 
 def load_token() -> str:
-    env = os.environ.get("INEGI_DENUE_TOKEN", "").strip()
-    if env:
-        return env
-    try:
-        import keyring
-        return (keyring.get_password(SERVICE, ACCOUNT) or "").strip()
-    except Exception:
-        return ""
+    """Devuelve automáticamente el token incluido, sin preguntar al usuario.
 
-def save_token(token: str) -> None:
-    token = token.strip()
-    if not token or len(token) < 16:
-        raise CredentialError("Escribe un token válido antes de guardarlo.")
-    try:
-        import keyring
-        keyring.set_password(SERVICE, ACCOUNT, token)
-    except Exception as exc:
-        raise CredentialError("No se pudo guardar el token en Windows; úsalo durante esta sesión.") from exc
-
-def delete_token() -> None:
-    try:
-        import keyring
-        if keyring.get_password(SERVICE, ACCOUNT):
-            keyring.delete_password(SERVICE, ACCOUNT)
-    except Exception as exc:
-        raise CredentialError("No se pudo borrar el token de las credenciales de Windows.") from exc
+    La variable de entorno permite sustituir la clave sin modificar el código.
+    """
+    return os.getenv("INEGI_DENUE_TOKEN", "").strip() or BUILTIN_TOKEN
