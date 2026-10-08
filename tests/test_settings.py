@@ -7,11 +7,24 @@ def test_fallback_without_prompt(monkeypatch):
     assert settings.load_token()
 
 
-def test_environment_override(monkeypatch):
+def test_old_environment_does_not_override_code_token(monkeypatch):
+    monkeypatch.setenv("INEGI_DENUE_TOKEN", "stale-token")
+    assert settings.load_token() == settings.BUILTIN_TOKEN
+    assert settings.token_source() == "settings.py (token incorporado)"
+
+def test_env_fallback_without_code_token(monkeypatch):
+    monkeypatch.setattr(settings, "BUILTIN_TOKEN", "")
     monkeypatch.setenv("INEGI_DENUE_TOKEN", "testing-token")
     assert settings.load_token() == "testing-token"
+    assert settings.token_source() == "variable INEGI_DENUE_TOKEN"
 
 
 def test_empty_override_uses_default(monkeypatch):
     monkeypatch.setenv("INEGI_DENUE_TOKEN", "  ")
     assert settings.load_token() == settings.BUILTIN_TOKEN
+
+def test_no_token_when_both_sources_empty(monkeypatch):
+    monkeypatch.setattr(settings, "BUILTIN_TOKEN", "")
+    monkeypatch.delenv("INEGI_DENUE_TOKEN", raising=False)
+    assert settings.load_token() == ""
+    assert settings.token_source().startswith("ninguna")
