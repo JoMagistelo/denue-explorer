@@ -13,3 +13,6 @@ dist/
 *.env.local
 *.credentials
 local_settings.json
+
+# Clave privada del usuario, no rastreada por Git.
+src/denue_explorer/local_token.py
