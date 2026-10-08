@@ -83,3 +83,22 @@ La aplicación ahora interpreta correctamente ese mensaje y distingue:
 **Para hacer consultas de verdad hace falta una clave activa de la API DENUE.** Solicítala o regénérala a través de la [página oficial del INEGI](https://www.inegi.org.mx/servicios/api_denue.html). Como pediste incrustarla en el programa, sustituye una única vez el valor `BUILTIN_TOKEN` del archivo `src/denue_explorer/settings.py` con tu nueva clave, guarda el archivo y reinicia la app. En esta instalación editable no tienes que repetir `setup.ps1`. Evita compartir la nueva clave en GitHub público.
 
 Para comprobar el formato de respuesta sin imprimir el token, puedes ejecutar `.\.venv\Scripts\python.exe scripts/diagnose_api.py`.
+
+## Cuando cambias la clave y sigue apareciendo un error
+
+**Importante:** la clave escrita en `src/denue_explorer/settings.py` tiene prioridad sobre `INEGI_DENUE_TOKEN`, incluso si en Windows quedó configurada una variable de entorno antigua. El programa lee la clave activa al buscar.
+
+Cierra la ventana del programa, inicia una nueva terminal en la raíz del proyecto y comprueba en modo seguro cuál archivo Python está cargado y qué contesta INEGI:
+
+```powershell
+.\.venv\Scripts\python.exe -m denue_explorer.diagnostics
+```
+
+El diagnóstico imprime la ruta de `settings.py`, el **origen** (nunca el contenido) de la clave, y el resultado de una consulta de prueba de 3 registros de BIMBO. No muestra token ni URL con token.
+
+- **OK**: la API reconoció la clave y devolvió resultados (que podrían ser cero).
+- **No autorizado**: INEGI no aceptó la clave activa. Comprueba que sea el token emitido específicamente para **API DENUE**, no para otro servicio de INEGI, y que esté habilitado.
+- **HTTPS / certificado**: problema de verificación TLS de la red, no necesariamente de credenciales.
+- Si la ruta muestra otra carpeta, se estaba ejecutando otra copia de la aplicación.
+
+Si modificas `settings.py`, **reinicia la aplicación**. No necesitas volver a ejecutar `setup.ps1` porque el proyecto se instaló en modo editable. No publiques claves nuevas en el repositorio público.
