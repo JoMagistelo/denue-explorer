@@ -53,7 +53,7 @@ def test_bad_json():
         search(SearchQuery('Nombre','x'),TOKEN,opener=FakeOpener(b'<html>fail</html>'))
 
 def test_bad_shape():
-    with pytest.raises(DenueError,match='inesperada'):
+    with pytest.raises(DenueError,match='reportó un error: Bad'):
         search(SearchQuery('Nombre','x'),TOKEN,opener=FakeOpener(b'{"error":"Bad"}'))
 
 def test_http_error_hides_token():
