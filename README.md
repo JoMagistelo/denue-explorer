@@ -10,7 +10,7 @@ Aplicación de escritorio en **Flet** para consultar la API oficial DENUE del IN
 ## Instalar desde cero en PowerShell / VS Code
 
 ```powershell
-git clone https://github.com/TU_USUARIO/denue-explorer.git
+git clone https://github.com/JoMagistelo/denue-explorer.git
 cd denue-explorer
 .\scripts\setup.ps1
 .\scripts\run.ps1
@@ -18,14 +18,18 @@ cd denue-explorer
 
 > `TU_USUARIO` es un marcador: sustituye por tu usuario al crear el repositorio GitHub. Si Windows bloquea scripts, ejecuta `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`.
 
-Ingresa el token en la aplicación (se mantiene en memoria, nunca se almacena en el repositorio), o establece temporalmente ` $env:INEGI_DENUE_TOKEN='tu-token' ` antes de iniciar.
+Ingresa el token en la aplicación y pulsa **Guardar token** para almacenarlo en el gestor de credenciales del sistema (Windows Credential Manager a través de keyring), o pulsa **Eliminar** para borrarlo. Alternativamente, o establece temporalmente ` $env:INEGI_DENUE_TOKEN='tu-token' ` antes de iniciar.
+
+## Seguridad del token
+
+**El token no se incluye en el código ni en GitHub.** Solo se guarda en el equipo al pulsar *Guardar token*. Si ya lo compartiste fuera del equipo, es recomendable regenerarlo en INEGI. Para las redes con inspección SSL, proporciona la ruta de tu CA institucional desde la interfaz, sin desactivar la validación HTTPS.
 
 ## Buscar
 - **Nombre**: establecimiento o razón social, entidad opcional `00` para México.
 - **BuscarEntidad**: términos separados por coma, de acuerdo con la documentación INEGI.
 - **Ficha**: ID de establecimiento DENUE, **no** CLEE ni FME.
 - Paginación: inicio y fin; máximo 100 registros por petición.
-- Filtrar: filtra solo los resultados descargados (no toda la base nacional).
+- Filtrar: filtra solo los resultados descargados, incluso por CLEE (no toda la base nacional).
 - Exportar CSV: crea `Downloads/denue_resultados.csv`.
 - **FME**: pertenece al Registro Público de Comercio; se abre el sitio de SIGER de manera externa, sin fingir que el DENUE resuelve FME.
 
@@ -38,6 +42,10 @@ $env:DENUE_CA_BUNDLE='C:\ruta\certificado-corporativo.pem'
 ```
 
 No uses `verify=False` en producción. Verifica el nombre de archivo del certificado y que sea un CA de confianza.
+
+## Controles disponibles
+
+Buscar, Anterior, Siguiente, Limpiar, Exportar CSV, Guardar token, Eliminar token, filtro local, detalle por establecimiento, Google Maps y consulta externa de FME en SIGER. El rango máximo es de 100 registros. La versión de Flet está fijada para evitar incompatibilidades de controles.
 
 ## Ejecutar pruebas
 
